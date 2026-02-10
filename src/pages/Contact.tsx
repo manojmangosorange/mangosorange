@@ -15,7 +15,7 @@ import Footer from "@/components/Footer";
 import LocationsSection from "@/components/LocationsSection";
 import ContactStatsSection from "@/components/ContactStatsSection";
 import ReachUsSection from "@/components/ReachUsSection";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().min(10, "Please enter a valid phone number"),
@@ -54,23 +54,15 @@ export default function Contact() {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.functions.invoke('send-contact-email', {
-        body: {
-          name: values.name,
-          phone: values.phone,
-          email: values.email,
-          subject: values.subject,
-          message: values.message
-        }
+      const response = await api.post<{ success: boolean }>('contact.php', {
+        name: values.name,
+        phone: values.phone,
+        email: values.email,
+        subject: values.subject,
+        message: values.message
       });
 
-      if (error) {
-        console.error("Supabase function error:", error);
-        toast.error("Failed to send message. Please try again.");
-        return;
-      }
-
-      if (data?.success) {
+      if (response?.success) {
         toast.success("Message sent successfully! We'll get back to you soon.");
         form.reset();
       } else {

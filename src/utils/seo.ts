@@ -3,10 +3,10 @@
 export const generateOrganizationSchema = () => ({
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'MangosOrange',
-  description: 'Leading IT services company providing cloud solutions, software development, and staffing services.',
-  url: 'https://mangosorange.co.in',
-  logo: 'https://mangosorange.co.in/upload-image/ad985e4f-a179-4593-963e-c3031c12dcff.webp',
+  name: 'MangosOrange Services Pvt. Ltd.',
+  description: 'IT consulting, staffing, payroll outsourcing, manpower, and software development company serving enterprises and SMEs across India.',
+  url: 'https://mangosorange.com',
+  logo: 'https://mangosorange.com/upload-image/ad985e4f-a179-4593-963e-c3031c12dcff.webp',
   contactPoint: [
     {
       '@type': 'ContactPoint',
@@ -19,8 +19,8 @@ export const generateOrganizationSchema = () => ({
   address: {
     '@type': 'PostalAddress',
     addressCountry: 'IN',
-    addressLocality: 'New Delhi',
-    addressRegion: 'Delhi'
+    addressLocality: 'Noida',
+    addressRegion: 'Delhi NCR'
   },
   sameAs: [
     // Add social media links if available
@@ -31,13 +31,13 @@ export const generateWebsiteSchema = () => ({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'MangosOrange',
-  url: 'https://mangosorange.co.in',
-  description: 'Leading IT services company providing cloud solutions, software development, and staffing services.',
+  url: 'https://mangosorange.com',
+  description: 'IT services, staffing solutions, payroll outsourcing, cloud and software development across India.',
   potentialAction: {
     '@type': 'SearchAction',
     target: {
       '@type': 'EntryPoint',
-      urlTemplate: 'https://mangosorange.co.in/search?q={search_term_string}'
+      urlTemplate: 'https://mangosorange.com/search?q={search_term_string}'
     },
     'query-input': 'required name=search_term_string'
   }
@@ -58,7 +58,7 @@ export const generateServiceSchema = (service: {
   provider: {
     '@type': 'Organization',
     name: 'MangosOrange',
-    url: 'https://mangosorange.co.in'
+    url: 'https://mangosorange.com'
   },
   areaServed: {
     '@type': 'Country',
@@ -107,7 +107,7 @@ export const generateJobPostingSchema = (job: {
   hiringOrganization: {
     '@type': 'Organization',
     name: 'MangosOrange',
-    sameAs: 'https://mangosorange.co.in'
+    sameAs: 'https://mangosorange.com'
   },
   jobLocation: {
     '@type': 'Place',
@@ -131,21 +131,21 @@ export const generateJobPostingSchema = (job: {
 
 // Generate page-specific meta descriptions
 export const generateMetaDescription = (page: string, content?: string): string => {
-  const baseDescription = 'MangosOrange - Leading IT services company in India.';
+  const baseDescription = 'MangosOrange Services Pvt. Ltd. is an IT consulting, staffing, payroll outsourcing, and software development company in India.';
   
   const descriptions: Record<string, string> = {
-    home: 'MangosOrange provides comprehensive IT services including cloud solutions, software development, and staffing services across India.',
-    about: 'Learn about MangosOrange, a trusted IT services provider with expertise in cloud infrastructure, custom software development, and professional staffing.',
-    contact: 'Contact MangosOrange for IT services, cloud solutions, and staffing requirements. Get in touch with our expert team today.',
-    careers: 'Join MangosOrange team. Explore exciting career opportunities in IT services, cloud computing, and software development.',
-    'cloud-strategy': 'Expert cloud strategy and migration services by MangosOrange. Transform your business with our comprehensive cloud solutions.',
-    staffing: 'Professional IT staffing solutions by MangosOrange. Find skilled developers, engineers, and IT professionals for your projects.',
-    'web-development': 'Custom web development services by MangosOrange. Build scalable, responsive websites and web applications.',
-    'app-development': 'Mobile and web application development services. Create innovative apps with MangosOrange expert development team.',
-    'custom-software': 'Custom software development solutions tailored to your business needs. Expert development services by MangosOrange.',
-    ecommerce: 'E-commerce development and solutions by MangosOrange. Build powerful online stores and digital commerce platforms.',
-    hmis: 'Hospital Management Information System (HMIS) solutions by MangosOrange. Streamline healthcare operations with our expertise.',
-    blog: 'MangosOrange blog and gallery. Latest updates, events, and milestones from our IT services company.'
+    home: 'IT consulting, staffing, payroll outsourcing, and software development services for enterprises and SMEs across India.',
+    about: 'MangosOrange Services Pvt. Ltd. (founded 2017, Delhi NCR) delivers IT services, staffing, payroll, and business automation.',
+    contact: 'Get in touch with MangosOrange for IT services, staffing solutions, payroll outsourcing, and cloud software development.',
+    careers: 'Apply to MangosOrange careers in IT services, staffing, cloud, and software development. Explore open roles.',
+    'cloud-strategy': 'Cloud strategy, migration, and modernization services for Indian businesses. AWS, Azure, and GCP support.',
+    staffing: 'IT staffing, manpower outsourcing, and recruitment services across India and Delhi NCR.',
+    'web-development': 'Custom web development and business automation solutions for SMEs and enterprises.',
+    'app-development': 'Mobile and web application development for business automation and growth.',
+    'custom-software': 'Custom software development tailored for payroll, staffing, and enterprise workflows.',
+    ecommerce: 'E-commerce development and digital commerce platforms for scalable online business.',
+    hmis: 'Hospital Management Information System (HMIS) software for healthcare operations.',
+    blog: 'Insights on IT services, staffing, payroll outsourcing, and business automation in India.'
   };
   
   return descriptions[page] || content || baseDescription;
@@ -153,21 +153,21 @@ export const generateMetaDescription = (page: string, content?: string): string 
 
 // Generate page-specific keywords
 export const generateKeywords = (page: string): string => {
-  const baseKeywords = 'MangosOrange, IT services, software development, India';
+  const baseKeywords = 'MangosOrange, IT services company India, staffing solutions, payroll outsourcing, manpower outsourcing, IT consulting';
   
   const keywords: Record<string, string> = {
-    home: 'IT services India, cloud solutions, software development, staffing services, MangosOrange',
-    about: 'IT company India, software development company, cloud services provider, MangosOrange team',
-    contact: 'IT services contact, software development company contact, MangosOrange contact details',
-    careers: 'IT jobs India, software developer jobs, cloud engineer careers, MangosOrange careers',
-    'cloud-strategy': 'cloud migration, cloud strategy, AWS, Azure, Google Cloud, cloud consulting',
-    staffing: 'IT staffing, software developer hiring, technical recruitment, offshore staffing',
-    'web-development': 'web development, website design, responsive web design, web applications',
-    'app-development': 'mobile app development, web app development, custom applications, React development',
-    'custom-software': 'custom software development, bespoke software, enterprise software solutions',
-    ecommerce: 'e-commerce development, online store development, e-commerce solutions, digital commerce',
-    hmis: 'HMIS, hospital management system, healthcare software, medical information system',
-    blog: 'MangosOrange blog, IT company news, technology updates, company events'
+    home: 'IT services company India, payroll outsourcing company, staffing solutions company, manpower outsourcing India, IT consulting services',
+    about: 'IT consulting Delhi NCR, staffing company in India, payroll outsourcing company Delhi NCR',
+    contact: 'MangosOrange contact, IT services company in Noida, payroll outsourcing Noida, staffing company Delhi NCR',
+    careers: 'IT jobs India, software developer jobs, staffing careers, MangosOrange careers',
+    'cloud-strategy': 'cloud migration services India, cloud strategy consulting, AWS Azure GCP services',
+    staffing: 'IT staffing services India, manpower outsourcing Noida, contract labour outsourcing',
+    'web-development': 'software development company for business automation, web development India',
+    'app-development': 'mobile app development India, business automation apps',
+    'custom-software': 'custom software development India, enterprise software solutions',
+    ecommerce: 'ecommerce development India, digital commerce solutions',
+    hmis: 'HMIS software India, hospital management system',
+    blog: 'payroll outsourcing guide, IT staffing vs traditional hiring, workforce outsourcing India'
   };
   
   return keywords[page] || baseKeywords;

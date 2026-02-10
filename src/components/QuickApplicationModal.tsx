@@ -71,24 +71,6 @@ const QuickApplicationModal = ({
         coverLetter: 'General interest application submitted via careers page'
       });
       if (success) {
-        // Send email notification to HR team
-        try {
-          const {
-            supabase
-          } = await import('@/integrations/supabase/client');
-          await supabase.functions.invoke('send-application-notification', {
-            body: {
-              applicantName: formData.name,
-              applicantEmail: formData.email,
-              applicantPhone: formData.phone || 'Not provided',
-              resumeUrl: resumeUrl
-            }
-          });
-          console.log('Email notification sent successfully');
-        } catch (emailError) {
-          console.error('Error sending email notification:', emailError);
-          // Don't fail the entire submission if email fails
-        }
         toast.success('Thank you for applying! Our HR team will contact you soon.');
         onSuccess();
         // Reset form

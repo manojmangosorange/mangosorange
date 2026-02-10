@@ -91,8 +91,6 @@ export const preloadFonts = () => {
 // Enhanced resource hints for external domains
 export const addResourceHints = () => {
   const hints = [
-    { rel: 'dns-prefetch', href: '//cuthapitafnzlktbbkdi.supabase.co' },
-    { rel: 'preconnect', href: 'https://cuthapitafnzlktbbkdi.supabase.co' },
     { rel: 'dns-prefetch', href: '//fonts.googleapis.com' },
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
     { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },

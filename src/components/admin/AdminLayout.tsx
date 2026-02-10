@@ -28,7 +28,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [location.pathname]);
 
   const checkAuth = async () => {
     const currentUser = await authService.getCurrentUser();

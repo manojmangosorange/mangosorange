@@ -1,18 +1,17 @@
-import { supabase } from '@/integrations/supabase/client';
-import bcryptjs from 'bcryptjs';
 import { Admin } from '@/types/career';
+import { api, apiFetch, setAuthToken, clearAuthToken } from '@/lib/api';
 
 export const authService = {
-  async verifyAdminCredentials(email: string, password: string): Promise<boolean> {
+  async verifyAdminCredentials(email: string, password: string): Promise<string | null> {
     try {
-      // For now, use hardcoded admin credentials from environment or fallback
-      const adminEmail = 'admin@mangosorange.com';
-      const adminPassword = 'admin123';
-      
-      return email === adminEmail && password === adminPassword;
+      const response = await api.post<{ token: string; user: Admin }>('auth_login.php', {
+        email,
+        password,
+      });
+      return response.token || null;
     } catch (error) {
       console.error('Admin verification error:', error);
-      return false;
+      return null;
     }
   },
 
@@ -20,57 +19,23 @@ export const authService = {
     try {
       console.log('Attempting sign in for:', email);
       
-      // Get admin user from database
-      const { data: profile, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
+      const response = await api.post<{ token: string; user: Admin }>('auth_login.php', {
+        email,
+        password,
+      });
 
-      if (error) {
-        console.error('Database error:', error);
-        return null;
+      if (response.token && response.user) {
+        // Store token
+        setAuthToken(response.token);
+        
+        // Store user data
+        localStorage.setItem('admin_user', JSON.stringify(response.user));
+        
+        console.log('Authentication successful for:', email);
+        return response.user;
       }
 
-      if (!profile) {
-        console.log('No profile found for email:', email);
-        return null;
-      }
-
-      console.log('Found profile:', { id: profile.id, email: profile.email, role: profile.role, name: profile.name });
-
-      // For the default admin user and any user with plain text password stored
-      // Check if it's the plain text password first (for our migration data)
-      let isValidPassword = false;
-      
-      if (password === profile.password_hash) {
-        // Plain text password match (for accounts created via migration or with plain text)
-        isValidPassword = true;
-        console.log('Plain text password match successful');
-      } else {
-        // For other users, try bcrypt comparison
-        try {
-          isValidPassword = await bcryptjs.compare(password, profile.password_hash);
-          console.log('Bcrypt comparison result:', isValidPassword);
-        } catch (error) {
-          console.log('Bcrypt comparison failed, password hash might be plain text');
-          isValidPassword = false;
-        }
-      }
-      
-      if (!isValidPassword) {
-        console.log('Invalid password for user:', email);
-        return null;
-      }
-
-      console.log('Authentication successful for:', email);
-      return {
-        id: profile.id,
-        email: profile.email,
-        name: profile.name || 'User',
-        role: (profile.role?.toString?.().toLowerCase() === 'admin' ? 'Admin' : 'Recruiter') as Admin['role'],
-        createdAt: profile.created_at || new Date().toISOString(),
-      };
+      return null;
     } catch (error) {
       console.error('Sign in error:', error);
       return null;
@@ -79,30 +44,19 @@ export const authService = {
 
   async signUp(email: string, password: string, role: 'Admin' | 'Recruiter' = 'Recruiter', name?: string): Promise<Admin | null> {
     try {
-      // Create admin profile directly in database
-      const password_hash = await bcryptjs.hash(password, 10);
-      console.log(password);
-      console.log(password_hash);
-      const { data: profile, error } = await supabase
-        .from('admin_users')
-        .insert([
-          {
-            email,
-            password_hash, // In production, hash this properly
-            role,
-            name: name || email.split('@')[0], // Use provided name or email prefix as default
-          }
-        ])
-        .select('id, email, role, name')
-        .single();
+      const response = await api.post<{ id?: string; success?: boolean }>('admin_users.php', {
+        email,
+        password,
+        role,
+        name: name || email.split('@')[0],
+      });
 
-      if (error) throw error;
-
+      const id = (response as any)?.id;
       return {
-        id: profile.id,
-        email: profile.email,
-        name: profile.name || 'User',
-        role: role,
+        id: id ? String(id) : 'new',
+        email,
+        name: name || email.split('@')[0],
+        role,
         createdAt: new Date().toISOString(),
       };
     } catch (error) {
@@ -111,16 +65,45 @@ export const authService = {
     }
   },
 
+  async signUpWithAdminToken(
+    email: string,
+    password: string,
+    role: 'Admin' | 'Recruiter' = 'Recruiter',
+    name?: string,
+    adminToken?: string
+  ): Promise<Admin | null> {
+    try {
+      const response = await apiFetch<{ id?: string; success?: boolean }>('admin_users.php', {
+        method: 'POST',
+        headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : undefined,
+        body: JSON.stringify({
+          email,
+          password,
+          role,
+          name: name || email.split('@')[0],
+        }),
+      });
+
+      const id = (response as any)?.id;
+      return {
+        id: id ? String(id) : 'new',
+        email,
+        name: name || email.split('@')[0],
+        role,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('Sign up with admin token error:', error);
+      return null;
+    }
+  },
+
   async signOut(): Promise<void> {
-    // Clear any stored session data
-    localStorage.removeItem('admin_user');
-    // Sign out from Supabase auth as well
-    await supabase.auth.signOut();
+    clearAuthToken();
   },
 
   async getCurrentUser(): Promise<Admin | null> {
     try {
-      // Check for stored session
       const stored = localStorage.getItem('admin_user');
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
@@ -131,12 +114,50 @@ export const authService = {
 
   async resetPassword(email: string): Promise<boolean> {
     try {
-      // For now, just return true as if email was sent
-      // In production, implement proper password reset
-      console.log('Password reset requested for:', email);
-      return true;
+      console.warn('resetPassword is not implemented for email-based resets:', email);
+      return false;
     } catch (error) {
       console.error('Reset password error:', error);
+      return false;
+    }
+  },
+
+  async listRecruiters(): Promise<Array<{ id: string; email: string; name: string; role: string; created_at: string }>> {
+    try {
+      const response = await api.get<any>('admin_users.php');
+      return Array.isArray(response) ? response : response?.data || [];
+    } catch (error) {
+      console.error('List recruiters error:', error);
+      return [];
+    }
+  },
+
+  async deleteRecruiter(id: string): Promise<boolean> {
+    try {
+      await api.delete<{ success: boolean }>(`admin_users.php?id=${encodeURIComponent(id)}`);
+      return true;
+    } catch (error) {
+      console.error('Delete recruiter error:', error);
+      return false;
+    }
+  },
+
+  async resetRecruiterPassword(id: string, password: string): Promise<boolean> {
+    try {
+      await api.put<{ success: boolean }>('admin_users.php', { id, password });
+      return true;
+    } catch (error) {
+      console.error('Reset recruiter password error:', error);
+      return false;
+    }
+  },
+
+  async updateRecruiterRole(id: string, role: 'Admin' | 'Recruiter'): Promise<boolean> {
+    try {
+      await api.put<{ success: boolean }>('admin_users.php', { id, role });
+      return true;
+    } catch (error) {
+      console.error('Update recruiter role error:', error);
       return false;
     }
   },

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Applicant } from '@/types/career';
@@ -14,9 +15,20 @@ interface ApplicantCardProps {
   onUpdate: () => void;
   jobTitle?: string;
   isGeneralApplication?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-const ApplicantCard = ({ applicant, onUpdate, jobTitle, isGeneralApplication = false }: ApplicantCardProps) => {
+const ApplicantCard = ({
+  applicant,
+  onUpdate,
+  jobTitle,
+  isGeneralApplication = false,
+  selectable = false,
+  selected = false,
+  onToggleSelect
+}: ApplicantCardProps) => {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState(applicant.status);
   const [notes, setNotes] = useState(applicant.notes || '');
@@ -96,6 +108,12 @@ const ApplicantCard = ({ applicant, onUpdate, jobTitle, isGeneralApplication = f
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {selectable && (
+              <Checkbox
+                checked={selected}
+                onCheckedChange={() => onToggleSelect?.(applicant.id)}
+              />
+            )}
             <Badge className={getStatusColor(applicant.status)}>
               {applicant.status}
             </Badge>

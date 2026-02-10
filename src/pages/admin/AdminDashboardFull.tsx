@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -12,7 +13,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { authService } from '@/lib/auth';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   UserPlus, 
@@ -29,7 +29,7 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
-import { Admin, DashboardStats } from '@/types/career';
+import { Admin, DashboardStats, JobPosting } from '@/types/career';
 import { careerAPI } from '@/lib/career-api';
 const createRecruiterSchema = z.object({
   name: z.string().min(1, 'Please enter the name'),
@@ -43,10 +43,10 @@ interface RecruiterInfo {
   name: string;
   role: string;
   created_at: string;
-  password_hash: string;
   plain_password?: string; // For newly created users only
 }
 const AdminDashboardFull = () => {
+  const [currentUser, setCurrentUser] = useState<Admin | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalJobs: 0,
     activeJobs: 0,
@@ -54,6 +54,7 @@ const AdminDashboardFull = () => {
     pendingApplications: 0,
     recentApplications: [],
   });
+  const [recentJobs, setRecentJobs] = useState<JobPosting[]>([]);
   const [recruiters, setRecruiters] = useState<RecruiterInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -61,6 +62,10 @@ const AdminDashboardFull = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [newlyCreatedPasswords, setNewlyCreatedPasswords] = useState<Record<string, string>>({});
+  const [recruiterSearch, setRecruiterSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'Admin' | 'Recruiter'>('all');
+  const [roleEdits, setRoleEdits] = useState<Record<string, 'Admin' | 'Recruiter'>>({});
+  const [roleSavingId, setRoleSavingId] = useState<string | null>(null);
   const createForm = useForm<CreateRecruiterFormData>({
     resolver: zodResolver(createRecruiterSchema),
     defaultValues: {
@@ -70,9 +75,17 @@ const AdminDashboardFull = () => {
     }
   });
   useEffect(() => {
+    const stored = localStorage.getItem('admin_user');
+    setCurrentUser(stored ? JSON.parse(stored) : null);
     loadRecruiters();
     loadStats();
+    loadRecentJobs();
   }, []);
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'Admin') {
+      window.location.href = '/admin';
+    }
+  }, [currentUser]);
 
   const loadStats = async () => {
     try {
@@ -84,15 +97,17 @@ const AdminDashboardFull = () => {
       setStatsLoading(false);
     }
   };
+  const loadRecentJobs = async () => {
+    try {
+      const jobs = await careerAPI.getJobPostings(true);
+      setRecentJobs(jobs.slice(0, 5));
+    } catch (error) {
+      console.error('Error loading recent jobs:', error);
+    }
+  };
   const loadRecruiters = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('admin_users').select('id, email, name, role, created_at, password_hash').order('created_at', {
-        ascending: false
-      });
-      if (error) throw error;
+      const data = await authService.listRecruiters();
       setRecruiters(data || []);
     } catch (error) {
       console.error('Error loading recruiters:', error);
@@ -128,10 +143,8 @@ const AdminDashboardFull = () => {
       return;
     }
     try {
-      const {
-        error
-      } = await supabase.from('admin_users').delete().eq('id', recruiterId);
-      if (error) throw error;
+      const success = await authService.deleteRecruiter(recruiterId);
+      if (!success) throw new Error('Delete failed');
       toast.success('Recruiter account deleted successfully');
       loadRecruiters();
     } catch (error) {
@@ -146,16 +159,8 @@ const AdminDashboardFull = () => {
       return;
     }
     try {
-      // Update password in database using auth service
-      const bcrypt = await import('bcryptjs');
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      const {
-        error
-      } = await supabase.from('admin_users').update({
-        password_hash: hashedPassword,
-        updated_at: new Date().toISOString()
-      }).eq('id', recruiterId);
-      if (error) throw error;
+      const success = await authService.resetRecruiterPassword(recruiterId, newPassword);
+      if (!success) throw new Error('Reset failed');
 
       // Store the new password temporarily for display
       setNewlyCreatedPasswords(prev => ({
@@ -174,6 +179,34 @@ const AdminDashboardFull = () => {
       ...prev,
       [recruiterId]: !prev[recruiterId]
     }));
+  };
+  const filteredRecruiters = recruiters.filter(r => {
+    const matchesSearch = r.name?.toLowerCase().includes(recruiterSearch.toLowerCase()) ||
+      r.email?.toLowerCase().includes(recruiterSearch.toLowerCase());
+    const matchesRole = roleFilter === 'all' || r.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
+  const handleRoleEdit = (recruiterId: string, role: 'Admin' | 'Recruiter') => {
+    setRoleEdits(prev => ({
+      ...prev,
+      [recruiterId]: role
+    }));
+  };
+  const saveRoleChange = async (recruiterId: string) => {
+    const role = roleEdits[recruiterId];
+    if (!role) return;
+    setRoleSavingId(recruiterId);
+    try {
+      const success = await authService.updateRecruiterRole(recruiterId, role);
+      if (!success) throw new Error('Role update failed');
+      toast.success('Role updated successfully');
+      loadRecruiters();
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast.error('Failed to update role');
+    } finally {
+      setRoleSavingId(null);
+    }
   };
   return <AdminLayout>
       <div className="space-y-6">
@@ -336,6 +369,58 @@ const AdminDashboardFull = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Recent Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Job Postings</CardTitle>
+                  <CardDescription>Latest jobs created in the system</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recentJobs.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">No jobs found</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recentJobs.map(job => (
+                        <div key={job.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                          <div>
+                            <p className="font-medium text-foreground">{job.title}</p>
+                            <p className="text-sm text-muted-foreground">{job.department} • {job.location}</p>
+                          </div>
+                          <Badge variant={job.status === 'Active' ? 'default' : 'secondary'}>
+                            {job.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Recruiters</CardTitle>
+                  <CardDescription>Most recently created recruiter accounts</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {recruiters.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">No recruiters found</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recruiters.slice(0, 5).map(r => (
+                        <div key={r.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
+                          <div>
+                            <p className="font-medium text-foreground">{r.name || 'No Name'}</p>
+                            <p className="text-sm text-muted-foreground">{r.email}</p>
+                          </div>
+                          <Badge variant={r.role === 'Admin' ? 'default' : 'secondary'}>{r.role}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="recruiters" className="space-y-6">
@@ -403,8 +488,33 @@ const AdminDashboardFull = () => {
               </Dialog>
             </div>
 
+            {/* Recruiter Filters */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Search recruiters by name or email..."
+                      value={recruiterSearch}
+                      onChange={(e) => setRecruiterSearch(e.target.value)}
+                    />
+                  </div>
+                  <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)}>
+                    <SelectTrigger className="w-full lg:w-52">
+                      <SelectValue placeholder="Filter by role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="Admin">Admin</SelectItem>
+                      <SelectItem value="Recruiter">Recruiter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid gap-4">
-              {recruiters.map(recruiter => <Card key={recruiter.id}>
+              {filteredRecruiters.map(recruiter => <Card key={recruiter.id}>
                   <CardContent className="flex items-center justify-between p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
@@ -421,6 +531,33 @@ const AdminDashboardFull = () => {
                             Created {new Date(recruiter.created_at).toLocaleDateString()}
                           </span>
                         </div>
+                        {currentUser?.id !== recruiter.id && (
+                          <div className="mt-3 flex flex-col gap-2">
+                            <Label className="text-xs text-muted-foreground">Role</Label>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={roleEdits[recruiter.id] || (recruiter.role as 'Admin' | 'Recruiter')}
+                                onValueChange={(v) => handleRoleEdit(recruiter.id, v as 'Admin' | 'Recruiter')}
+                              >
+                                <SelectTrigger className="w-40">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Admin">Admin</SelectItem>
+                                  <SelectItem value="Recruiter">Recruiter</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!roleEdits[recruiter.id] || roleSavingId === recruiter.id}
+                                onClick={() => saveRoleChange(recruiter.id)}
+                              >
+                                {roleSavingId === recruiter.id ? 'Saving...' : 'Save Role'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

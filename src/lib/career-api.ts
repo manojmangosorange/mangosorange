@@ -1,5 +1,19 @@
-import { supabase } from '@/integrations/supabase/client';
 import { JobPosting, Applicant, DashboardStats } from '@/types/career';
+import { api } from '@/lib/api';
+
+const unwrapArray = (payload: any): any[] => {
+  if (Array.isArray(payload)) return payload;
+  if (payload?.data && Array.isArray(payload.data)) return payload.data;
+  if (payload?.items && Array.isArray(payload.items)) return payload.items;
+  return [];
+};
+
+const unwrapObject = (payload: any): any | null => {
+  if (!payload) return null;
+  if (Array.isArray(payload)) return payload[0] || null;
+  if (payload?.data && !Array.isArray(payload.data)) return payload.data;
+  return payload;
+};
 
 export const careerAPI = {
   // ------------------------------
@@ -7,51 +21,28 @@ export const careerAPI = {
   // ------------------------------
   async getJobPostings(includeHidden = false): Promise<JobPosting[]> {
     try {
-      let query = supabase
-        .from('job_postings')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const endpoint = includeHidden ? 'jobs.php?includeHidden=1' : 'jobs.php';
+      const response = await api.get<any>(endpoint);
+      const rows = unwrapArray(response);
 
-      if (!includeHidden) {
-        query = query.eq('is_visible', true).eq('status', 'Active');
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Error fetching job postings:', error);
-        throw error;
-      }
-
-      // Get applicant counts separately
-      const jobsWithCounts = await Promise.all(
-        (data || []).map(async (job: any) => {
-          const { count } = await supabase
-            .from('applicants')
-            .select('*', { count: 'exact', head: true })
-            .eq('job_id', job.id);
-
-          return {
-            id: String(job.id),
-            title: job.title,
-            department: job.department,
-            type: (job.type as JobPosting['type']),
-            location: job.location,
-            experience: job.experience,
-            salary: job.salary,
-            description: job.description,
-            responsibilities: job.responsibilities,
-            requirements: job.requirements,
-            deadline: job.deadline,
-            status: (job.status as JobPosting['status']),
-            isVisible: job.is_visible,
-            createdAt: job.created_at,
-            updatedAt: job.updated_at,
-            applicantCount: count || 0,
-          };
-        })
-      );
-
-      return jobsWithCounts;
+      return rows.map((job: any) => ({
+        id: String(job.id),
+        title: job.title,
+        department: job.department,
+        type: job.type as JobPosting['type'],
+        location: job.location,
+        experience: job.experience,
+        salary: job.salary,
+        description: job.description,
+        responsibilities: job.responsibilities,
+        requirements: job.requirements,
+        deadline: job.deadline,
+        status: job.status as JobPosting['status'],
+        isVisible: Boolean(job.is_visible),
+        createdAt: job.created_at,
+        updatedAt: job.updated_at,
+        applicantCount: Number(job.applicant_count || 0),
+      }));
     } catch (error) {
       console.error('Error fetching job postings:', error);
       return [];
@@ -60,22 +51,15 @@ export const careerAPI = {
 
   async getJobPosting(id: string): Promise<JobPosting | null> {
     try {
-      const { data, error } = await supabase
-        .from('job_postings')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching job posting:', error);
-        throw error;
-      }
+      const response = await api.get<any>(`jobs.php?id=${encodeURIComponent(id)}`);
+      const data = unwrapObject(response);
+      if (!data) return null;
 
       return {
         id: String(data.id),
         title: data.title,
         department: data.department,
-        type: (data.type as JobPosting['type']),
+        type: data.type as JobPosting['type'],
         location: data.location,
         experience: data.experience,
         salary: data.salary,
@@ -83,8 +67,8 @@ export const careerAPI = {
         responsibilities: data.responsibilities,
         requirements: data.requirements,
         deadline: data.deadline,
-        status: (data.status as JobPosting['status']),
-        isVisible: data.is_visible,
+        status: data.status as JobPosting['status'],
+        isVisible: Boolean(data.is_visible),
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
@@ -99,51 +83,41 @@ export const careerAPI = {
   ): Promise<JobPosting | null> {
     try {
       console.log('Creating job posting with data:', job);
-      
-      const { data, error } = await supabase
-        .from('job_postings')
-        .insert([
-          {
-            title: job.title,
-            department: job.department,
-            type: job.type,
-            location: job.location,
-            experience: job.experience,
-            salary: job.salary,
-            description: job.description,
-            responsibilities: job.responsibilities,
-            requirements: job.requirements,
-            deadline: job.deadline,
-            status: job.status,
-            is_visible: job.isVisible,
-          },
-        ])
-        .select()
-        .single();
 
-      if (error) {
-        console.error('Error creating job posting:', error);
-        console.error('Error details:', error.message, error.details, error.hint);
-        throw error;
-      }
+      const response = await api.post<any>('jobs.php', {
+        title: job.title,
+        department: job.department,
+        type: job.type,
+        location: job.location,
+        experience: job.experience,
+        salary: job.salary,
+        description: job.description,
+        responsibilities: job.responsibilities,
+        requirements: job.requirements,
+        deadline: job.deadline,
+        status: job.status,
+        is_visible: job.isVisible,
+      });
 
-      console.log('Job posting created successfully:', data);
+      const data = unwrapObject(response) || {};
+      const id = data.id ? String(data.id) : 'new';
+
       return {
-        id: String(data.id),
-        title: data.title,
-        department: data.department,
-        type: (data.type as JobPosting['type']),
-        location: data.location,
-        experience: data.experience,
-        salary: data.salary,
-        description: data.description,
-        responsibilities: data.responsibilities,
-        requirements: data.requirements,
-        deadline: data.deadline,
-        status: (data.status as JobPosting['status']),
-        isVisible: data.is_visible,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        id,
+        title: data.title ?? job.title,
+        department: data.department ?? job.department,
+        type: (data.type ?? job.type) as JobPosting['type'],
+        location: data.location ?? job.location,
+        experience: data.experience ?? job.experience,
+        salary: data.salary ?? job.salary,
+        description: data.description ?? job.description,
+        responsibilities: data.responsibilities ?? job.responsibilities,
+        requirements: data.requirements ?? job.requirements,
+        deadline: data.deadline ?? job.deadline,
+        status: (data.status ?? job.status) as JobPosting['status'],
+        isVisible: Boolean(data.is_visible ?? job.isVisible),
+        createdAt: data.created_at ?? new Date().toISOString(),
+        updatedAt: data.updated_at ?? new Date().toISOString(),
       };
     } catch (error) {
       console.error('Error creating job posting:', error);
@@ -153,11 +127,8 @@ export const careerAPI = {
 
   async updateJobPosting(id: string, updates: Partial<JobPosting>): Promise<boolean> {
     try {
-      const updateData: any = {
-        updated_at: new Date().toISOString(),
-      };
+      const updateData: any = {};
 
-      // Only include fields that are being updated
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.department !== undefined) updateData.department = updates.department;
       if (updates.type !== undefined) updateData.type = updates.type;
@@ -171,15 +142,10 @@ export const careerAPI = {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.isVisible !== undefined) updateData.is_visible = updates.isVisible;
 
-      const { error } = await supabase
-        .from('job_postings')
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating job posting:', error);
-        throw error;
-      }
+      await api.put<{ success: boolean }>(`jobs.php?id=${encodeURIComponent(id)}`, {
+        id,
+        ...updateData,
+      });
       return true;
     } catch (error) {
       console.error('Error updating job posting:', error);
@@ -189,11 +155,7 @@ export const careerAPI = {
 
   async deleteJobPosting(id: string): Promise<boolean> {
     try {
-      const { error } = await supabase.from('job_postings').delete().eq('id', id);
-      if (error) {
-        console.error('Error deleting job posting:', error);
-        throw error;
-      }
+      await api.delete<{ success: boolean }>(`jobs.php?id=${encodeURIComponent(id)}`);
       return true;
     } catch (error) {
       console.error('Error deleting job posting:', error);
@@ -206,31 +168,13 @@ export const careerAPI = {
   // ------------------------------
   async getApplicants(jobId?: string): Promise<Applicant[]> {
     try {
-      let query = supabase
-        .from('applicants')
-        .select(`
-          *,
-          job_postings (
-            id,
-            title
-          )
-        `)
-        .order('applied_at', { ascending: false })
-        .not('job_id', 'is', null); // Only job-specific applications
+      const endpoint = jobId ? `applicants.php?job_id=${encodeURIComponent(jobId)}` : 'applicants.php';
+      const response = await api.get<any>(endpoint);
+      const rows = unwrapArray(response);
 
-      if (jobId) {
-        query = query.eq('job_id', jobId);
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Error fetching applicants:', error);
-        throw error;
-      }
-
-      return (data ?? []).map((applicant: any) => ({
+      return rows.map((applicant: any) => ({
         id: String(applicant.id),
-        jobId: String(applicant.job_id),
+        jobId: applicant.job_id ? String(applicant.job_id) : '',
         name: applicant.name || '',
         email: applicant.email || '',
         phone: applicant.phone || '',
@@ -240,7 +184,7 @@ export const careerAPI = {
         notes: applicant.notes || '',
         appliedAt: applicant.applied_at,
         updatedAt: applicant.updated_at,
-        jobTitle: applicant.job_postings?.title || '',
+        jobTitle: applicant.job_title || '',
       }));
     } catch (error) {
       console.error('Error fetching applicants:', error);
@@ -254,19 +198,11 @@ export const careerAPI = {
     notes?: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('applicants')
-        .update({
-          status,
-          notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error updating applicant status:', error);
-        throw error;
-      }
+      await api.put<{ success: boolean }>('applicants.php', {
+        id,
+        status,
+        notes,
+      });
       return true;
     } catch (error) {
       console.error('Error updating applicant status:', error);
@@ -284,43 +220,17 @@ export const careerAPI = {
   }): Promise<boolean> {
     try {
       console.log('Submitting application:', application);
-      
-      const { error } = await supabase.from('applicants').insert([
-        {
-          job_id: application.jobId || null, // Allow null for general interest applications
-          name: application.name,
-          email: application.email,
-          phone: application.phone || null,
-          resume_url: application.resumeUrl,
-          cover_letter: application.coverLetter || null,
-          status: 'Applied',
-        },
-      ]);
 
-      if (error) {
-        console.error('Error submitting application:', error);
-        console.error('Error details:', error.message, error.details, error.hint);
-        throw error;
-      }
-      
+      await api.post<{ success: boolean }>('applicants.php', {
+        jobId: application.jobId || null,
+        name: application.name,
+        email: application.email,
+        phone: application.phone || null,
+        resumeUrl: application.resumeUrl,
+        coverLetter: application.coverLetter || null,
+      });
+
       console.log('Application submitted successfully');
-
-      // Send notification email
-      try {
-        await supabase.functions.invoke('send-application-notification', {
-          body: {
-            applicantName: application.name,
-            applicantEmail: application.email,
-            applicantPhone: application.phone || 'Not provided',
-            resumeUrl: application.resumeUrl,
-            isGeneralApplication: !application.jobId
-          }
-        });
-      } catch (emailError) {
-        console.error('Error sending notification email:', emailError);
-        // Don't fail the application submission if email fails
-      }
-      
       return true;
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -330,20 +240,12 @@ export const careerAPI = {
 
   async getGeneralApplications(): Promise<Applicant[]> {
     try {
-      const { data, error } = await supabase
-        .from('applicants')
-        .select('*')
-        .is('job_id', null) // Only general applications (resume drop)
-        .order('applied_at', { ascending: false });
+      const response = await api.get<any>('applicants.php?general=1');
+      const rows = unwrapArray(response);
 
-      if (error) {
-        console.error('Error fetching general applications:', error);
-        throw error;
-      }
-
-      return (data ?? []).map((applicant: any) => ({
+      return rows.map((applicant: any) => ({
         id: String(applicant.id),
-        jobId: '', // No specific job for general applications
+        jobId: '',
         name: applicant.name || '',
         email: applicant.email || '',
         phone: applicant.phone || '',
@@ -365,34 +267,30 @@ export const careerAPI = {
   // ------------------------------
   async getDashboardStats(): Promise<DashboardStats> {
     try {
-      const [jobsResult, totalApplicantsResult, pendingApplicantsResult, recentApplicantsResult] =
-        await Promise.all([
-          supabase.from('job_postings').select('status'),
-          supabase.from('applicants').select('*', { count: 'exact', head: true }),
-          supabase.from('applicants').select('*', { count: 'exact', head: true }).eq('status', 'Applied'),
-          supabase
-            .from('applicants')
-            .select(`
-              *,
-              job_postings(title)
-            `)
-            .order('applied_at', { ascending: false })
-            .limit(5),
-        ]);
+      const [jobsResponse, applicantsResponse] = await Promise.all([
+        api.get<any>('jobs.php?includeHidden=1'),
+        api.get<any>('applicants.php'),
+      ]);
 
-      const jobs = jobsResult.data ?? [];
-      const totalApplicants = totalApplicantsResult.count ?? 0;
-      const pendingApplicants = pendingApplicantsResult.count ?? 0;
-      const recentApplicants = recentApplicantsResult.data ?? [];
+      const jobs = unwrapArray(jobsResponse);
+      const applicants = unwrapArray(applicantsResponse);
 
-      return {
-        totalJobs: jobs.length,
-        activeJobs: jobs.filter((j: any) => j.status === 'Active').length,
-        totalApplicants,
-        pendingApplications: pendingApplicants,
-        recentApplications: recentApplicants.map((applicant: any) => ({
+      const totalJobs = jobs.length;
+      const activeJobs = jobs.filter((j: any) => j.status === 'Active').length;
+      const totalApplicants = applicants.length;
+      const pendingApplications = applicants.filter((a: any) => (a.status || 'Applied') === 'Applied').length;
+
+      const recentApplications = applicants
+        .slice()
+        .sort((a: any, b: any) => {
+          const aTime = new Date(a.applied_at || 0).getTime();
+          const bTime = new Date(b.applied_at || 0).getTime();
+          return bTime - aTime;
+        })
+        .slice(0, 5)
+        .map((applicant: any) => ({
           id: String(applicant.id),
-          jobId: String(applicant.job_id),
+          jobId: applicant.job_id ? String(applicant.job_id) : '',
           name: applicant.name || '',
           email: applicant.email || '',
           phone: applicant.phone || '',
@@ -402,8 +300,15 @@ export const careerAPI = {
           notes: applicant.notes || '',
           appliedAt: applicant.applied_at,
           updatedAt: applicant.updated_at,
-          jobTitle: applicant.job_postings?.title || '',
-        })),
+          jobTitle: applicant.job_title || '',
+        }));
+
+      return {
+        totalJobs,
+        activeJobs,
+        totalApplicants,
+        pendingApplications,
+        recentApplications,
       };
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -423,30 +328,14 @@ export const careerAPI = {
   async uploadResume(file: File): Promise<string | null> {
     try {
       console.log('Starting resume upload:', file.name, file.size, file.type);
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `resumes/${fileName}`;
 
-      console.log('Upload path:', filePath);
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const { error: uploadError } = await supabase.storage
-        .from('career-files')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      const response = await api.post<{ url: string }>('upload_resume.php', formData);
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        console.error('Upload error details:', uploadError.message);
-        throw uploadError;
-      }
-
-      console.log('File uploaded successfully');
-      const { data } = supabase.storage.from('career-files').getPublicUrl(filePath);
-      console.log('Public URL generated:', data.publicUrl);
-      return data.publicUrl;
+      console.log('File uploaded successfully, URL:', response.url);
+      return response.url || null;
     } catch (error) {
       console.error('Error uploading resume:', error);
       return null;

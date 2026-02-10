@@ -52,8 +52,6 @@ const AdminLogin = () => {
     try {
       const user = await authService.signIn(data.email, data.password);
       if (user) {
-        // Store user session
-        localStorage.setItem('admin_user', JSON.stringify(user));
         toast.success('Welcome back!');
         // Redirect based on role
         if (user.role === 'Admin') {
@@ -76,26 +74,33 @@ const AdminLogin = () => {
     setLoading(true);
     try {
       // Verify admin credentials first
-      const isValidAdmin = await authService.verifyAdminCredentials(data.adminEmail, data.adminPassword);
-      if (!isValidAdmin) {
+      const adminToken = await authService.verifyAdminCredentials(data.adminEmail, data.adminPassword);
+      if (!adminToken) {
         toast.error('Invalid admin credentials. Only admins can create accounts.');
         return;
       }
 
-      const user = await authService.signUp(data.email, data.password, 'Recruiter', data.name);
-      if (user) {
-        // Store user session
-        localStorage.setItem('admin_user', JSON.stringify(user));
-        toast.success('Account created successfully!');
-        // Redirect based on role
-        if (user.role === 'Admin') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/admin');
-        }
-      } else {
+      const created = await authService.signUpWithAdminToken(
+        data.email,
+        data.password,
+        'Recruiter',
+        data.name,
+        adminToken
+      );
+      if (!created) {
         toast.error('Failed to create account');
+        return;
       }
+
+      // Sign in as the newly created recruiter to get their token
+      const user = await authService.signIn(data.email, data.password);
+      if (!user) {
+        toast.error('Account created, but login failed. Please sign in.');
+        return;
+      }
+
+      toast.success('Account created successfully!');
+      navigate('/admin');
     } catch (error) {
       console.error('Signup error:', error);
       toast.error('Signup failed');

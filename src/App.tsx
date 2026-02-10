@@ -30,6 +30,7 @@ const HardwareServices = lazy(() => import("./pages/HardwareServices"));
 const ITConsulting = lazy(() => import("./pages/ITConsulting"));
 const SystemIntegration = lazy(() => import("./pages/SystemIntegration"));
 const TechnicalSupport = lazy(() => import("./pages/TechnicalSupport"));
+const SiteMap = lazy(() => import("./pages/SiteMap"));
  
 
 // Lazy load staffing pages
@@ -213,6 +214,11 @@ const App = () => (
           <Route path="/technical-support" element={
             <Suspense fallback={<PageLoader />}>
               <TechnicalSupport />
+            </Suspense>
+          } />
+          <Route path="/sitemap" element={
+            <Suspense fallback={<PageLoader />}>
+              <SiteMap />
             </Suspense>
           } />
           <Route path="/blog" element={

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { careerAPI } from '@/lib/career-api';
-import { DashboardStats } from '@/types/career';
+import { DashboardStats, JobPosting } from '@/types/career';
 import { 
   Briefcase, 
   Users, 
@@ -11,8 +11,11 @@ import {
   TrendingUp,
   Calendar,
   Mail,
-  Phone
+  Phone,
+  PlusCircle
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
@@ -22,10 +25,12 @@ const AdminDashboard = () => {
     pendingApplications: 0,
     recentApplications: [],
   });
+  const [recentJobs, setRecentJobs] = useState<JobPosting[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadStats();
+    loadRecentJobs();
   }, []);
 
   const loadStats = async () => {
@@ -36,6 +41,14 @@ const AdminDashboard = () => {
       console.error('Error loading dashboard stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+  const loadRecentJobs = async () => {
+    try {
+      const jobs = await careerAPI.getJobPostings(true);
+      setRecentJobs(jobs.slice(0, 5));
+    } catch (error) {
+      console.error('Error loading recent jobs:', error);
     }
   };
 
@@ -117,6 +130,29 @@ const AdminDashboard = () => {
           })}
         </div>
 
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link to="/admin/jobs" className="gap-2">
+                  <PlusCircle className="w-4 h-4" />
+                  Create Job
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/admin/applicants">View Applicants</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/admin/resume-drop">Resume Drop</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Recent Applications */}
         <Card>
           <CardHeader>
@@ -169,6 +205,39 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Jobs */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Job Postings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentJobs.length === 0 ? (
+              <div className="text-center py-8 text-gray-800">
+                No recent jobs
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className="flex items-center justify-between p-3 border border-border rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium text-foreground">{job.title}</p>
+                      <p className="text-sm text-gray-800">
+                        {job.department} • {job.location}
+                      </p>
+                    </div>
+                    <Badge variant={job.status === 'Active' ? 'default' : 'secondary'}>
+                      {job.status}
+                    </Badge>
                   </div>
                 ))}
               </div>

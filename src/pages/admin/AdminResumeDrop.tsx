@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminLayout from '@/components/admin/AdminLayout';
 import ApplicantCard from '@/components/admin/ApplicantCard';
@@ -15,6 +16,9 @@ const AdminResumeDrop = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<Applicant['status']>('Applied');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -38,6 +42,38 @@ const AdminResumeDrop = () => {
     const matchesStatus = statusFilter === 'all' || applicant.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredApplicants.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredApplicants.map(a => a.id));
+    }
+  };
+
+  const applyBulkStatus = async () => {
+    if (selectedIds.length === 0) return;
+    setBulkUpdating(true);
+    try {
+      await Promise.all(
+        selectedIds.map(id => careerAPI.updateApplicantStatus(id, bulkStatus))
+      );
+      toast.success(`Updated ${selectedIds.length} applications`);
+      setSelectedIds([]);
+      loadData();
+    } catch (error) {
+      console.error('Bulk update error:', error);
+      toast.error('Failed to update applications');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
 
   const generateCSV = () => {
     const headers = [
@@ -203,7 +239,35 @@ const AdminResumeDrop = () => {
         </Card>
 
         {/* Download CSV Button */}
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedIds.length > 0 && selectedIds.length === filteredApplicants.length}
+              onCheckedChange={toggleSelectAll}
+            />
+            <span className="text-sm text-gray-800">
+              Select all ({selectedIds.length}/{filteredApplicants.length})
+            </span>
+            {selectedIds.length > 0 && (
+              <>
+                <Select value={bulkStatus} onValueChange={(v) => setBulkStatus(v as Applicant['status'])}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Applied">Applied</SelectItem>
+                    <SelectItem value="Shortlisted">Shortlisted</SelectItem>
+                    <SelectItem value="Interviewed">Interviewed</SelectItem>
+                    <SelectItem value="Hired">Hired</SelectItem>
+                    <SelectItem value="Rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={applyBulkStatus} disabled={bulkUpdating}>
+                  {bulkUpdating ? 'Updating...' : 'Apply Status'}
+                </Button>
+              </>
+            )}
+          </div>
           <Button
             onClick={downloadCSV}
             variant="outline"
@@ -240,6 +304,9 @@ const AdminResumeDrop = () => {
                 onUpdate={loadData}
                 jobTitle="General Application"
                 isGeneralApplication={true}
+                selectable={true}
+                selected={selectedIds.includes(applicant.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
