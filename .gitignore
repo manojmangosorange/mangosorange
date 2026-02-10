@@ -11,6 +11,16 @@ node_modules
 
 *.local
 
+# Sensitive env/config
+.env
+api/config.php
+
+# Runtime uploads
+uploads/
+
+# PHP dependencies (if using Composer)
+vendor/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -21,4 +31,3 @@ node_modules
 *.njsproj
 *.sln
 *.sw?
-
